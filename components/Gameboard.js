@@ -1,9 +1,10 @@
 import React, {useState, useEffect} from "react";
-import { Text, View, Pressable } from "react-native";
+import { Text, View, Pressable, Button } from "react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import style from "../style/style";
-import { NBR_OF_DICES, NBR_OF_THROWS, MAX_SPOT} from "../constants/Game"
+import { NBR_OF_DICES, NBR_OF_THROWS, MAX_SPOT, SCOREBOARD_KEY} from "../constants/Game"
 import {Col, Grid} from "react-native-easy-grid"
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let board = [];
 
@@ -20,6 +21,11 @@ export default Gameboard = ({ route })  => {
     const [dicePointsTotal, setDicePointsTotal] = useState(new Array(MAX_SPOT).fill(0));
 
     const [selectedDicePoints, setSelectedDicePoints] = useState(new Array(MAX_SPOT).fill(false));
+
+    const [scores, setScores] = useState([]);
+
+    const sum = dicePointsTotal.map(datum => datum.prix).reduce((a, b) => a + b)
+    
     
 
     const row = [];
@@ -69,11 +75,24 @@ export default Gameboard = ({ route })  => {
     useEffect(() => {
         if (playerName === "" && route.params?.player) {
             setPlayerName(route.params.player);
+            getScoreBoardData();
         }
     }, []);
 
+    useEffect(() => {
+      if(nbrOfThrowsLeft === 0) {
+        setStatus("Select your points");
+      } 
+      else if(nbrOfThrowsLeft < 0) {
+        setNbrOfThrowsLeft(NBR_OF_THROWS - 1);
+      }
+      else if(selectedDicePoints.every(x => x)) {
+        savePlayerPoints();
+      }
+    }, [nbrOfThrowsLeft]);
+
     function getDiceColor(i) {
-          return selectedDices[i] ? "black" : "steelblue";
+          return selectedDices[i] ? "#183A1D" : "#F0A04B";
         }
 
   
@@ -131,19 +150,51 @@ export default Gameboard = ({ route })  => {
         setStatus("select and throw dices again");
       }
 
+      const getScoreBoardData = async () => {
+        try {
+          const jsonValue = await AsyncStorage.getItem(SCOREBOARD_KEY)
+          if (jsonValue !== null) {
+            let tmpScores = JSON.parse(jsonValue);
+            setScores(tmpScores);
+          }
+        } catch(error) {
+          console.log("read error" + error.message);
+        }
+      }
+
+      const savePlayerPoints = async () => {
+        const playerPoints = {
+          name:"PLAYER: " + playerName + "  ",
+          date: new Date().toLocaleString() + "      ",
+          points:"POINTS:  " + sum
+        }
+
+        try {
+          const newScore = [...scores, playerPoints];
+          const jsonValue = JSON.stringify(newScore);
+          await AsyncStorage.setItem(SCOREBOARD_KEY, jsonValue);
+        } catch(error) {
+          console.log("save error" + error.message);
+        }
+      }
+
       
   return (
     <View style={style.gameboard}>
       <View style={style.flex}>{row}</View>
-      <Text style={style.gameInfo}>Throws left: {nbrOfThrowsLeft}</Text>
-      <Text style={style.gameInfo}>{status}</Text>
-      <Pressable style={style.button} 
-        onPress={() => throwDices()}>
-        <Text style={style.buttonText}>Throw Dices</Text>
-      </Pressable>
+      <Text style={style.gameinfo}>Throws left: {nbrOfThrowsLeft}</Text>
+      <Text style={style.gameinfo}>{status}</Text>
+      <View style = {{margin: 20}}>
+      <Button
+        color={"#F0A04B"}
+        title="THROW DICES"
+        onPress={() => throwDices()}/>
+      </View>
+      
       <View style={style.dicePoints}><Grid>{pointsRow}</Grid></View>
       <View style={style.dicePoints}><Grid>{buttonsRow}</Grid></View>
-      <Text>Player: {playerName}</Text>
+      <Text style={style.playerNameText}>Player: {playerName}</Text>
     </View>
   ) 
 }
+
